@@ -30,6 +30,7 @@ model Exam {
   enunciadoProgramacion String?       // enunciado específico para exámenes de programación
   codigoInicial         String?       // código inicial/template para exámenes de programación
   testCases             Json?         // casos de prueba para evaluación automática de exámenes de programación
+  solucionReferencia    String?       // solución de referencia del profesor (solo visible para él)
   profesor              User          @relation(fields: [profesorId], references: [id])
   intentos              ExamAttempt[]
   history               ExamHistory[]
