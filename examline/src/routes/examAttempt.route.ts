@@ -409,6 +409,223 @@ const ExamAttemptRoute = (prisma: PrismaClient) => {
     }
   });
 
+  // GET /exam-attempts/window/:windowId - Obtener todos los intentos de una ventana (solo profesores)
+  router.get("/window/:windowId", authenticateToken, requireRole(['professor']), async (req, res) => {
+    const windowId = parseInt(req.params.windowId);
+    const professorId = req.user!.userId;
+
+    if (isNaN(windowId)) {
+      return res.status(400).json({ error: "ID de ventana inválido" });
+    }
+
+    try {
+      // Verificar que el profesor es dueño de esta ventana
+      const examWindow = await prisma.examWindow.findUnique({
+        where: { id: windowId },
+        include: {
+          exam: {
+            select: {
+              id: true,
+              titulo: true,
+              tipo: true,
+              profesorId: true
+            }
+          }
+        }
+      });
+
+      if (!examWindow) {
+        return res.status(404).json({ error: "Ventana no encontrada" });
+      }
+
+      if (examWindow.exam.profesorId !== professorId) {
+        return res.status(403).json({ error: "No autorizado para ver estos intentos" });
+      }
+
+      // Obtener todos los intentos finalizados de esta ventana
+      const attempts = await prisma.examAttempt.findMany({
+        where: {
+          examWindowId: windowId,
+          estado: "finalizado"
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true
+            }
+          },
+          exam: {
+            select: {
+              id: true,
+              titulo: true,
+              tipo: true,
+              lenguajeProgramacion: true
+            }
+          }
+        },
+        orderBy: [
+          { finishedAt: 'desc' }
+        ]
+      });
+
+      res.json(attempts);
+    } catch (error) {
+      console.error('Error fetching window attempts:', error);
+      res.status(500).json({ error: "Error obteniendo intentos de la ventana" });
+    }
+  });
+
+  // GET /exam-attempts/:attemptId/professor-view - Ver detalle de un intento (solo profesores)
+  router.get("/:attemptId/professor-view", authenticateToken, requireRole(['professor']), async (req, res) => {
+    const attemptId = parseInt(req.params.attemptId);
+    const professorId = req.user!.userId;
+
+    if (isNaN(attemptId)) {
+      return res.status(400).json({ error: "ID de intento inválido" });
+    }
+
+    try {
+      const attempt = await prisma.examAttempt.findUnique({
+        where: { id: attemptId },
+        include: {
+          exam: {
+            include: { 
+              preguntas: true
+            }
+          },
+          examWindow: true,
+          user: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true
+            }
+          }
+        }
+      });
+
+      if (!attempt) {
+        return res.status(404).json({ error: "Intento no encontrado" });
+      }
+
+      // Verificar que el profesor es dueño del examen
+      if (attempt.exam.profesorId !== professorId) {
+        return res.status(403).json({ error: "No autorizado para ver este intento" });
+      }
+
+      // Si es un examen de programación, incluir archivos guardados (ambas versiones)
+      let manualFiles: any[] = [];
+      let submissionFiles: any[] = [];
+      
+      if (attempt.exam.tipo === 'programming') {
+        manualFiles = await prisma.examFile.findMany({
+          where: {
+            examId: attempt.examId,
+            userId: attempt.userId,
+            version: 'manual'
+          },
+          select: {
+            id: true,
+            filename: true,
+            content: true,
+            version: true,
+            createdAt: true,
+            updatedAt: true
+          },
+          orderBy: {
+            filename: 'asc'
+          }
+        });
+
+        submissionFiles = await prisma.examFile.findMany({
+          where: {
+            examId: attempt.examId,
+            userId: attempt.userId,
+            version: 'submission'
+          },
+          select: {
+            id: true,
+            filename: true,
+            content: true,
+            version: true,
+            createdAt: true,
+            updatedAt: true
+          },
+          orderBy: {
+            filename: 'asc'
+          }
+        });
+      }
+
+      // Agregar archivos al resultado
+      const result = {
+        ...attempt,
+        manualFiles,
+        submissionFiles
+      };
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching attempt for professor:', error);
+      res.status(500).json({ error: "Error obteniendo intento" });
+    }
+  });
+
+  // PUT /exam-attempts/:attemptId/manual-grade - Asignar calificación manual (solo profesores)
+  router.put("/:attemptId/manual-grade", authenticateToken, requireRole(['professor']), async (req, res) => {
+    const attemptId = parseInt(req.params.attemptId);
+    const professorId = req.user!.userId;
+    const { calificacionManual, comentariosCorreccion } = req.body;
+
+    if (isNaN(attemptId)) {
+      return res.status(400).json({ error: "ID de intento inválido" });
+    }
+
+    if (calificacionManual === undefined || calificacionManual === null) {
+      return res.status(400).json({ error: "Calificación manual requerida" });
+    }
+
+    try {
+      // Verificar que el intento existe y el profesor es dueño del examen
+      const attempt = await prisma.examAttempt.findUnique({
+        where: { id: attemptId },
+        include: {
+          exam: {
+            select: {
+              profesorId: true
+            }
+          }
+        }
+      });
+
+      if (!attempt) {
+        return res.status(404).json({ error: "Intento no encontrado" });
+      }
+
+      if (attempt.exam.profesorId !== professorId) {
+        return res.status(403).json({ error: "No autorizado para calificar este intento" });
+      }
+
+      // Actualizar calificación manual
+      const updatedAttempt = await prisma.examAttempt.update({
+        where: { id: attemptId },
+        data: {
+          calificacionManual: parseFloat(calificacionManual),
+          comentariosCorreccion: comentariosCorreccion || null,
+          corregidoPor: professorId,
+          corregidoAt: new Date()
+        }
+      });
+
+      res.json(updatedAttempt);
+    } catch (error) {
+      console.error('Error updating manual grade:', error);
+      res.status(500).json({ error: "Error actualizando calificación manual" });
+    }
+  });
+
   return router;
 };
 
