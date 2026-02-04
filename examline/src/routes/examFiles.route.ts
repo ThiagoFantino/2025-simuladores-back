@@ -203,6 +203,168 @@ router.post('/:examId/files/submission', authenticateToken, async (req, res) => 
   }
 });
 
+// Endpoints para solución de referencia (solo profesores)
+
+// Obtener archivos de solución de referencia de un examen
+router.get('/:examId/reference-solution', authenticateToken, async (req, res) => {
+  try {
+    const { examId } = req.params;
+    const userId = req.user!.userId;
+
+    // Verificar que el examen existe y el usuario es el profesor
+    const exam = await prisma.exam.findUnique({
+      where: { id: parseInt(examId) }
+    });
+
+    if (!exam) {
+      return res.status(404).json({ error: 'Examen no encontrado' });
+    }
+
+    if (exam.profesorId !== userId) {
+      return res.status(403).json({ error: 'No tienes permiso para ver la solución de referencia' });
+    }
+
+    const files = await prisma.examFile.findMany({
+      where: {
+        examId: parseInt(examId),
+        userId: exam.profesorId,
+        version: 'reference_solution'
+      },
+      select: {
+        id: true,
+        filename: true,
+        content: true,
+        version: true,
+        createdAt: true,
+        updatedAt: true
+      },
+      orderBy: {
+        filename: 'asc'
+      }
+    });
+
+    res.json(files);
+  } catch (error) {
+    console.error('Error fetching reference solution files:', error);
+    res.status(500).json({ error: 'Error obteniendo archivos de referencia' });
+  }
+});
+
+// Guardar/actualizar archivos de solución de referencia
+router.post('/:examId/reference-solution', authenticateToken, async (req, res) => {
+  try {
+    const { examId } = req.params;
+    const { files } = req.body; // Array de { filename, content }
+    const userId = req.user!.userId;
+
+    // Verificar que el examen existe y el usuario es el profesor
+    const exam = await prisma.exam.findUnique({
+      where: { id: parseInt(examId) }
+    });
+
+    if (!exam) {
+      return res.status(404).json({ error: 'Examen no encontrado' });
+    }
+
+    if (exam.profesorId !== userId) {
+      return res.status(403).json({ error: 'No tienes permiso para modificar la solución de referencia' });
+    }
+
+    if (exam.tipo !== 'programming') {
+      return res.status(400).json({ error: 'Solo los exámenes de programación pueden tener solución de referencia' });
+    }
+
+    if (!files || !Array.isArray(files)) {
+      return res.status(400).json({ error: 'Se requiere un array de archivos' });
+    }
+
+    // Crear/actualizar todos los archivos con versión "reference_solution"
+    const savedFiles = [];
+    for (const fileData of files) {
+      const { filename, content } = fileData;
+      
+      if (!filename) {
+        continue;
+      }
+
+      const file = await prisma.examFile.upsert({
+        where: {
+          examId_userId_filename_version: {
+            examId: parseInt(examId),
+            userId: exam.profesorId,
+            filename: filename,
+            version: 'reference_solution'
+          }
+        },
+        update: {
+          content: content || '',
+          updatedAt: new Date()
+        },
+        create: {
+          examId: parseInt(examId),
+          userId: exam.profesorId,
+          filename: filename,
+          content: content || '',
+          version: 'reference_solution'
+        }
+      });
+
+      savedFiles.push(file);
+    }
+
+    res.json({ 
+      message: 'Archivos de solución de referencia guardados correctamente',
+      files: savedFiles 
+    });
+  } catch (error) {
+    console.error('Error saving reference solution files:', error);
+    res.status(500).json({ error: 'Error guardando archivos de referencia' });
+  }
+});
+
+// Eliminar un archivo de solución de referencia
+router.delete('/:examId/reference-solution/:filename', authenticateToken, async (req, res) => {
+  try {
+    const { examId, filename } = req.params;
+    const userId = req.user!.userId;
+
+    // Verificar que el examen existe y el usuario es el profesor
+    const exam = await prisma.exam.findUnique({
+      where: { id: parseInt(examId) }
+    });
+
+    if (!exam) {
+      return res.status(404).json({ error: 'Examen no encontrado' });
+    }
+
+    if (exam.profesorId !== userId) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar archivos de referencia' });
+    }
+
+    const file = await prisma.examFile.findFirst({
+      where: {
+        examId: parseInt(examId),
+        userId: exam.profesorId,
+        filename: filename,
+        version: 'reference_solution'
+      }
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: 'Archivo no encontrado' });
+    }
+
+    await prisma.examFile.delete({
+      where: { id: file.id }
+    });
+
+    res.json({ message: 'Archivo de referencia eliminado correctamente' });
+  } catch (error) {
+    console.error('Error deleting reference solution file:', error);
+    res.status(500).json({ error: 'Error eliminando archivo de referencia' });
+  }
+});
+
   return router;
 };
 
