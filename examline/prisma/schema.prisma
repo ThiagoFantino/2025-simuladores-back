@@ -30,6 +30,7 @@ model Exam {
   enunciadoProgramacion String?       // enunciado específico para exámenes de programación
   codigoInicial         String?       // código inicial/template para exámenes de programación
   testCases             Json?         // casos de prueba para evaluación automática de exámenes de programación
+  solucionReferencia    String?       // solución de referencia del profesor (solo visible para él)
   profesor              User          @relation(fields: [profesorId], references: [id])
   intentos              ExamAttempt[]
   history               ExamHistory[]
@@ -111,6 +112,10 @@ model ExamAttempt {
   puntaje      Float?
   testResults  Json?       // resultados detallados de los test cases ejecutados
   estado       String      @default("en_progreso")
+  calificacionManual Float? // calificación asignada manualmente por el profesor
+  comentariosCorreccion String? // comentarios del profesor sobre la corrección
+  corregidoPor Int?        // ID del profesor que corrigió
+  corregidoAt  DateTime?   // fecha de corrección manual
   examWindow   ExamWindow? @relation(fields: [examWindowId], references: [id])
   exam         Exam        @relation(fields: [examId], references: [id])
   user         User        @relation(fields: [userId], references: [id])
