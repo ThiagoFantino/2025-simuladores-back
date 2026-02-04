@@ -18,7 +18,8 @@ const ExamRoute = (prisma: PrismaClient) => {
       enunciadoProgramacion,
       codigoInicial,
       testCases,
-      solucionReferencia
+      solucionReferencia,
+      referenceFiles // Array de archivos de referencia
     } = req.body;
 
     try {
@@ -70,6 +71,39 @@ const ExamRoute = (prisma: PrismaClient) => {
         data: examData,
         include: { preguntas: true },
       });
+
+      // Guardar archivos de referencia si existen (solo para exámenes de programación)
+      if (tipo === 'programming' && referenceFiles && Array.isArray(referenceFiles) && referenceFiles.length > 0) {
+        // Filtrar archivos que tengan contenido
+        const filesWithContent = referenceFiles.filter((f: any) => f.filename && f.content && f.content.trim());
+        
+        if (filesWithContent.length > 0) {
+          // Guardar cada archivo en la tabla ExamFile
+          await Promise.all(filesWithContent.map((file: any) =>
+            prisma.examFile.upsert({
+              where: {
+                examId_userId_filename_version: {
+                  examId: examen.id,
+                  userId: req.user!.userId,
+                  filename: file.filename,
+                  version: 'reference_solution'
+                }
+              },
+              update: {
+                content: file.content,
+                updatedAt: new Date()
+              },
+              create: {
+                examId: examen.id,
+                userId: req.user!.userId,
+                filename: file.filename,
+                content: file.content,
+                version: 'reference_solution'
+              }
+            })
+          ));
+        }
+      }
 
       res.status(201).json(examen);
     } catch (err) {
