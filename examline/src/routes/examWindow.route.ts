@@ -439,12 +439,11 @@ router.get('/disponibles', authenticateToken, requireRole(['student']), async (r
       ]
     };
 
-    // Filtro por materia
+    // Filtro por nombre de ventana
     if (materia) {
-      whereClause.exam = {
-        titulo: {
-          contains: materia as string
-        }
+      whereClause.nombre = {
+        contains: materia as string,
+        mode: 'insensitive'
       };
     }
 
@@ -454,7 +453,8 @@ router.get('/disponibles', authenticateToken, requireRole(['student']), async (r
         ...whereClause.exam,
         profesor: {
           nombre: {
-            contains: profesor as string
+            contains: profesor as string,
+            mode: 'insensitive'
           }
         }
       };
