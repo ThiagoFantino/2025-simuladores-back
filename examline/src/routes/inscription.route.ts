@@ -1,5 +1,4 @@
 import { type PrismaClient } from "@prisma/client";
-import { notifyStatusChange } from './examWindow.route';
 import { Router } from "express";
 import { authenticateToken, requireRole } from "../middleware/auth.ts";
 
@@ -88,15 +87,7 @@ const InscriptionRoute = (prisma: PrismaClient) => {
             include: { exam: { select: { profesorId: true, titulo: true } } }
           });
 
-          // Notificar al profesor
-          notifyStatusChange((closed.exam as any).profesorId, [{
-            id: closed.id,
-            titulo: (closed.exam as any).titulo,
-            estadoAnterior: 'programada',
-            estadoNuevo: 'cerrada_inscripciones',
-            fechaInicio: (closed as any).fechaInicio,
-            timestamp: Date.now()
-          }]);
+          // Notificación Socket.IO eliminada - cambio se reflejará al refrescar
         }
 
         return res.status(201).json(reactivatedInscription);
@@ -131,15 +122,7 @@ const InscriptionRoute = (prisma: PrismaClient) => {
           include: { exam: { select: { profesorId: true, titulo: true } } }
         });
 
-        // Notificar al profesor en tiempo real
-        notifyStatusChange((closed.exam as any).profesorId, [{
-          id: closed.id,
-          titulo: (closed.exam as any).titulo,
-          estadoAnterior: 'programada',
-          estadoNuevo: 'cerrada_inscripciones',
-          fechaInicio: (closed as any).fechaInicio,
-          timestamp: Date.now()
-        }]);
+        // Notificación Socket.IO eliminada - cambio se reflejará al refrescar
       }
 
       res.status(201).json(inscription);
@@ -253,15 +236,7 @@ const InscriptionRoute = (prisma: PrismaClient) => {
               data: { estado: 'programada' }
             });
 
-            // Notificar al profesor en tiempo real
-            notifyStatusChange(windowNow.exam.profesorId, [{
-              id: windowNow.id,
-              titulo: windowNow.exam.titulo,
-              estadoAnterior: 'cerrada_inscripciones',
-              estadoNuevo: 'programada',
-              fechaInicio: windowNow.fechaInicio,
-              timestamp: Date.now()
-            }]);
+            // Notificación Socket.IO eliminada - cambio se reflejará al refrescar
           }
         }
       } catch (e) {
