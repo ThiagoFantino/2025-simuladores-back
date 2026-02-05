@@ -175,14 +175,45 @@ const ExamAttemptRoute = (prisma: PrismaClient) => {
 
       // Agregar datos específicos según el tipo de examen
       if (attempt.exam.tipo === 'programming') {
-        updateData.codigoProgramacion = codigoProgramacion;
-        
-        // NUEVO: Evaluación automática con test cases
+        // 🔒 Obtener el archivo principal guardado manualmente
+        // Convención: main.py (Python) o main.js (JavaScript)
         const exam = await prisma.exam.findUnique({
           where: { id: attempt.examId }
         });
         
-        if (exam && exam.testCases && Array.isArray(exam.testCases) && exam.testCases.length > 0) {
+        if (!exam) {
+          return res.status(404).json({ error: "Examen no encontrado" });
+        }
+        
+        // Determinar el nombre del archivo principal según el lenguaje
+        const mainFileName = exam.lenguajeProgramacion === 'python' ? 'main.py' : 'main.js';
+        
+        // Buscar el archivo principal guardado manualmente (versión "manual")
+        const mainFile = await prisma.examFile.findFirst({
+          where: {
+            examId: attempt.examId,
+            userId: userId,
+            filename: mainFileName,
+            version: 'manual'
+          },
+          orderBy: {
+            updatedAt: 'desc' // Obtener la versión más reciente
+          }
+        });
+        
+        // Validar que existe el archivo principal
+        if (!mainFile || !mainFile.content || mainFile.content.trim() === '') {
+          return res.status(400).json({ 
+            error: `Debes guardar el archivo principal "${mainFileName}" antes de finalizar el examen` 
+          });
+        }
+        
+        // Usar el contenido del archivo guardado manualmente
+        const codigoParaEvaluar = mainFile.content;
+        updateData.codigoProgramacion = codigoParaEvaluar;
+        
+        // Evaluación automática con test cases
+        if (exam.testCases && Array.isArray(exam.testCases) && exam.testCases.length > 0) {
           const CodeExecutionService = (await import('../services/codeExecution.service.ts')).default;
           const codeExecutionService = new CodeExecutionService();
           
@@ -193,7 +224,7 @@ const ExamAttemptRoute = (prisma: PrismaClient) => {
           for (const testCase of exam.testCases as any[]) {
             try {
               const result = await codeExecutionService.executeCode(
-                codigoProgramacion,
+                codigoParaEvaluar,
                 exam.lenguajeProgramacion as 'python' | 'javascript',
                 { 
                   input: testCase.input || '',

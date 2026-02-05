@@ -62,6 +62,7 @@ model ExamHistory {
 model ExamWindow {
   id            Int           @id @default(autoincrement())
   examId        Int
+  nombre        String        // nombre descriptivo de la ventana
   fechaInicio   DateTime?
   duracion      Int?
   modalidad     String
@@ -70,7 +71,6 @@ model ExamWindow {
   estado        String        @default("programada")
   activa        Boolean       @default(true)
   sinTiempo     Boolean       @default(false)
-  requierePresente Boolean    @default(false)
   usaSEB        Boolean       @default(false) // si requiere Safe Exam Browser
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -93,7 +93,6 @@ model Inscription {
   examWindowId Int
   inscribedAt  DateTime   @default(now())
   cancelledAt  DateTime?
-  presente     Boolean?
   examWindow   ExamWindow @relation(fields: [examWindowId], references: [id])
   user         User       @relation(fields: [userId], references: [id])
 

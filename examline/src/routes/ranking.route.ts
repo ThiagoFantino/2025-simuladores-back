@@ -80,11 +80,19 @@ export const createRankingRoutes = () => {
         const timeInMinutes = timeInSeconds ? Math.floor(timeInSeconds / 60) : null;
         const remainingSeconds = timeInSeconds ? timeInSeconds % 60 : null;
 
+        // Usar calificacionManual si existe, sino puntaje automático
+        const notaFinal = attempt.calificacionManual !== null && attempt.calificacionManual !== undefined
+          ? attempt.calificacionManual
+          : attempt.puntaje;
+
         return {
           userId: attempt.user.id,
           nombreEstudiante: attempt.user.nombre,
           email: attempt.user.email,
-          puntaje: attempt.puntaje,
+          puntaje: notaFinal,
+          puntajeAutomatico: attempt.puntaje,
+          calificacionManual: attempt.calificacionManual,
+          corregidoManualmente: attempt.calificacionManual !== null && attempt.calificacionManual !== undefined,
           tiempoSegundos: timeInSeconds,
           tiempoFormateado: timeInSeconds 
             ? `${timeInMinutes}m ${remainingSeconds}s`
