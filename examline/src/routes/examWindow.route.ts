@@ -2,50 +2,6 @@ import { type PrismaClient } from "@prisma/client";
 import { Router } from "express";
 import { authenticateToken, requireRole } from "../middleware/auth.ts";
 
-// Variable global para almacenar la instancia de Socket.IO
-let io: any = null;
-
-// Función para configurar Socket.IO (será llamada desde el main server)
-export const setSocketIO = (socketInstance: any) => {
-  io = socketInstance;
-};
-
-// Permitir a otros módulos notificar cambios de estado via WebSocket
-export const notifyStatusChange = (profesorId: number, changes: any[]) => {
-  try {
-    broadcastStatusUpdate(profesorId, changes);
-  } catch (e) {
-    console.error('Error emitiendo notificación:', e);
-  }
-};
-
-// 🚀 Función ULTRA-OPTIMIZADA para broadcast de milisegundos
-const broadcastStatusUpdate = (profesorId: number, changes: any[]) => {
-  if (io && changes.length > 0) {
-    const broadcastStartTime = process.hrtime.bigint();
-    
-    // Payload ultra-optimizado (mínimo JSON)
-    const optimizedPayload = {
-      t: 'sc', // type: status_change (abreviado)
-      c: changes.map(change => ({
-        i: change.id,           // id
-        s: change.estadoNuevo,  // estado (solo el nuevo)
-        ts: change.timestamp || Date.now() // timestamp preciso
-      })),
-      ts: Date.now() // timestamp del broadcast
-    };
-    
-    // Envío inmediato sin compresión ni validaciones adicionales
-    io.to(`professor_${profesorId}`).emit('su', optimizedPayload); // 'su' = statusUpdate (abreviado)
-    
-    const broadcastEndTime = process.hrtime.bigint();
-    const broadcastLatency = Number(broadcastEndTime - broadcastStartTime) / 1000000;
-    
-  } else if (changes.length > 0) {
-    console.log('⚠️ Socket.IO no disponible, cambios no enviados via WebSocket');
-  }
-};
-
 function parseLocalDate(dateString: string): Date {
   let fecha: string, hora: string;
 
@@ -136,7 +92,7 @@ async function updateWindowStatuses(prisma: PrismaClient, profesorId?: number, r
         updatedWindows.push(change);
       }
 
-      // Agrupar cambios por profesor para WebSocket
+      // Agrupar cambios por profesor
       if (broadcastChanges) {
         const windowProfesorId = (window as any).exam.profesorId;
         if (!changesByProfesor.has(windowProfesorId)) {
@@ -147,12 +103,7 @@ async function updateWindowStatuses(prisma: PrismaClient, profesorId?: number, r
     }
   }
 
-  // Enviar notificaciones WebSocket si hay cambios
-  if (broadcastChanges && changesByProfesor.size > 0) {
-    changesByProfesor.forEach((changes, profesorId) => {
-      broadcastStatusUpdate(profesorId, changes);
-    });
-  }
+  // Notificaciones WebSocket eliminadas - los cambios se reflejan al refrescar
 
   return updatedWindows;
 }
@@ -215,18 +166,9 @@ const scheduleExactStateChange = async (windowId: number, changeTime: Date, newS
       const actualDelay = Number(executionTime - startTime) / 1000000;
       
       try {
-        // 🚀 BROADCAST ULTRA-RÁPIDO (antes de BD para latencia mínima)
-        const broadcastStart = process.hrtime.bigint();
-        broadcastStatusUpdate(profesorId, [{
-          id: windowId,
-          titulo: `Ventana ${windowId}`, // Título temporal para velocidad
-          estadoAnterior: newState === 'en_curso' ? 'programada' : 'en_curso',
-          estadoNuevo: newState,
-          fechaInicio: changeTime.toISOString(),
-          timestamp: Date.now() // Timestamp preciso
-        }]);
+        // Broadcast WebSocket eliminado - cambios de estado se reflejan al refrescar
         
-        // Actualizar BD en paralelo (no bloquear WebSocket)
+        // Actualizar BD en paralelo
         if (prismaInstance) {
           setImmediate(async () => {
             try {
@@ -435,7 +377,7 @@ const ExamWindowRoute = (prisma: PrismaClient) => {
   // Obtener ventanas de examen del profesor
   router.get('/profesor', authenticateToken, requireRole(['professor']), async (req, res) => {
     try {
-      // Primero actualizar estados automáticamente y notificar via WebSocket
+      // Actualizar estados automáticamente
       await updateWindowStatuses(prisma, req.user!.userId, false, true);
       
       // Luego obtener las ventanas actualizadas
@@ -886,17 +828,7 @@ router.get('/disponibles', authenticateToken, requireRole(['student']), async (r
         }
       });
 
-      // Broadcast del cambio via WebSocket para actualización en tiempo real
-      if (io) {
-        const statusPayload = {
-          t: 'toggle', // type: toggle
-          i: windowId, // id
-          a: updatedWindow.activa, // activa
-          ts: Date.now()
-        };
-        
-        io.to(`professor_${profesorId}`).emit('window_toggle', statusPayload);
-      }
+      // Socket.IO broadcast eliminado - cambios se reflejan al refrescar la página
 
       const action = updatedWindow.activa ? 'activada' : 'desactivada';
 
