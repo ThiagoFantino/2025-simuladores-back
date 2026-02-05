@@ -279,7 +279,7 @@ const ExamWindowRoute = (prisma: PrismaClient) => {
   const router = Router();
 
   router.post('/', authenticateToken, requireRole(['professor']), async (req, res) => {
-  const { examId, fechaInicio, duracion, modalidad, cupoMaximo, notas, sinTiempo, requierePresente, usaSEB ,kioskMode} = req.body;
+  const { examId, nombre, fechaInicio, duracion, modalidad, cupoMaximo, notas, sinTiempo, usaSEB, kioskMode} = req.body;
 
   try {
         const examIdNumber = parseInt(examId);
@@ -340,13 +340,13 @@ const ExamWindowRoute = (prisma: PrismaClient) => {
         // Preparar datos para la creación
         const windowData: any = {
           examId: examIdNumber,
+          nombre: nombre || `Ventana ${Date.now()}`,
           modalidad,
           cupoMaximo: cupoMaximoNumber,
           notas: notas || null,
           sinTiempo: isSinTiempo,
-          requierePresente: Boolean(requierePresente),
           usaSEB: Boolean(usaSEB),
-          kioskMode: kioskMode, // Inicialmente igual a usaSEB
+          kioskMode: kioskMode,
           estado: isSinTiempo ? 'programada' : 'programada'
         };
 
@@ -532,7 +532,7 @@ router.get('/disponibles', authenticateToken, requireRole(['student']), async (r
   // Actualizar ventana de examen
   router.put('/:id', authenticateToken, requireRole(['professor']), async (req, res) => {
     const windowId = parseInt(req.params.id);
-    const { fechaInicio, duracion, modalidad, cupoMaximo, notas, activa, estado, requierePresente, usaSEB, sinTiempo } = req.body;
+    const { nombre, fechaInicio, duracion, modalidad, cupoMaximo, notas, activa, estado, usaSEB, sinTiempo } = req.body;
 
     try {
       // Verificar que la ventana existe y pertenece al profesor
@@ -551,6 +551,7 @@ router.get('/disponibles', authenticateToken, requireRole(['student']), async (r
 
       const updateData: any = {};
       
+      if (nombre !== undefined) updateData.nombre = nombre;
       if (fechaInicio) updateData.fechaInicio = new Date(fechaInicio);
       if (duracion !== undefined) updateData.duracion = Number(duracion);
       if (modalidad) updateData.modalidad = modalidad;
@@ -558,7 +559,6 @@ router.get('/disponibles', authenticateToken, requireRole(['student']), async (r
       if (notas !== undefined) updateData.notas = notas;
       if (activa !== undefined) updateData.activa = activa;
       if (estado) updateData.estado = estado;
-      if (requierePresente !== undefined) updateData.requierePresente = Boolean(requierePresente);
       if (usaSEB !== undefined) updateData.usaSEB = Boolean(usaSEB);
       if (sinTiempo !== undefined) updateData.sinTiempo = Boolean(sinTiempo);
 
@@ -619,59 +619,9 @@ router.get('/disponibles', authenticateToken, requireRole(['student']), async (r
     }
   });
 
-  // Toggle del sistema de presentismo
-  router.patch('/:id/toggle-presentismo', authenticateToken, requireRole(['professor']), async (req, res) => {
-    const windowId = parseInt(req.params.id);
+  // Endpoint toggle-presentismo eliminado (funcionalidad removida)
 
-    try {
-      // Verificar que la ventana existe y pertenece al profesor
-      const existingWindow = await prisma.examWindow.findFirst({
-        where: {
-          id: windowId,
-          exam: {
-            profesorId: req.user!.userId
-          }
-        }
-      });
-
-      if (!existingWindow) {
-        return res.status(404).json({ error: 'Ventana no encontrada o no tienes permisos' });
-      }
-
-      // No permitir cambiar presentismo en ventanas ya finalizadas
-      if (existingWindow.estado === 'finalizada') {
-        return res.status(400).json({ 
-          error: 'No se puede modificar el presentismo en una ventana finalizada' 
-        });
-      }
-
-      const updatedWindow = await prisma.examWindow.update({
-        where: { id: windowId },
-        data: {
-          requierePresente: !existingWindow.requierePresente
-        },
-        include: {
-          exam: { select: { titulo: true } }
-        }
-      });
-
-      const action = updatedWindow.requierePresente ? 'activado' : 'desactivado';
-      
-      res.json({ 
-        success: true, 
-        requierePresente: updatedWindow.requierePresente,
-        message: `Sistema de presentismo ${action} correctamente`,
-        window: {
-          id: updatedWindow.id,
-          requierePresente: updatedWindow.requierePresente,
-          examTitulo: updatedWindow.exam.titulo
-        }
-      });
-    } catch (error: any) {
-      console.error('Error en toggle presentismo:', error);
-      res.status(500).json({ error: 'Error interno del servidor' });
-    }
-  });
+  // Endpoint toggle-presentismo eliminado (funcionalidad removida)
 
   // Eliminar ventana de examen
   router.delete('/:id', authenticateToken, requireRole(['professor']), async (req, res) => {
