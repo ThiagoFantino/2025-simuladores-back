@@ -799,6 +799,57 @@ router.get('/disponibles', authenticateToken, requireRole(['student']), async (r
     }
   });
 
+  // PUT /exam-windows/:windowId/publicar-notas - Publicar u ocultar notas de una ventana
+  router.put("/:windowId/publicar-notas", authenticateToken, requireRole(['professor']), async (req, res) => {
+    const windowId = parseInt(req.params.windowId);
+    const professorId = req.user!.userId;
+    const { notasPublicadas } = req.body;
+
+    if (isNaN(windowId)) {
+      return res.status(400).json({ error: "ID de ventana inválido" });
+    }
+
+    if (typeof notasPublicadas !== 'boolean') {
+      return res.status(400).json({ error: "El campo notasPublicadas debe ser booleano" });
+    }
+
+    try {
+      // Verificar que la ventana existe y pertenece al profesor
+      const examWindow = await prisma.examWindow.findUnique({
+        where: { id: windowId },
+        include: {
+          exam: {
+            select: { profesorId: true }
+          }
+        }
+      });
+
+      if (!examWindow) {
+        return res.status(404).json({ error: "Ventana no encontrada" });
+      }
+
+      if (examWindow.exam.profesorId !== professorId) {
+        return res.status(403).json({ error: "No autorizado para modificar esta ventana" });
+      }
+
+      // Actualizar estado de publicación de notas
+      const updatedWindow = await prisma.examWindow.update({
+        where: { id: windowId },
+        data: {
+          notasPublicadas
+        }
+      });
+
+      res.json({
+        message: notasPublicadas ? 'Notas publicadas correctamente' : 'Notas ocultadas correctamente',
+        notasPublicadas: updatedWindow.notasPublicadas
+      });
+    } catch (error) {
+      console.error('Error actualizando publicación de notas:', error);
+      res.status(500).json({ error: 'Error interno del servidor' });
+    }
+  });
+
   // 🚀 Inicializar sistema ULTRA-PRECISO de MILISEGUNDOS
   startMillisecondSystem(prisma);
 
