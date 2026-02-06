@@ -220,7 +220,7 @@ const UserRoute = (prisma: PrismaClient) => {
       res.status(500).json({ error: 'Error al eliminar el usuario.' });
     }
   });*/
-  // Eliminar usuario pero reasignando sus exámenes al "Backuser"
+  // Eliminar usuario y todos sus datos relacionados
 router.delete('/:id', async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
@@ -235,33 +235,82 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: "Usuario no encontrado." });
     }
 
-    // Buscar o crear el usuario especial "Backuser"
-    let backuser = await prisma.user.findUnique({
-      where: { email: "backuser@system.com" }, 
-    });
+    // Obtener todos los IDs de exámenes del usuario
+    const examIds = user.exams.map(exam => exam.id);
 
-    if (!backuser) {
-      backuser = await prisma.user.create({
-        data: {
-          nombre: "Backuser",
-          email: "backuser@system.com",
-          password: await bcrypt.hash("backuser1235123123123123123123ferroAguanteganalalibertadores1231231231231241351231351Q@25242345676789765434234e56678978654323w4e567", 10), // 👈 contraseña dummy
-          rol: "system",
-        },
+    // Eliminar en cascada todos los datos relacionados
+    if (examIds.length > 0) {
+      // 1. Eliminar archivos de examen de TODOS los usuarios relacionados con estos exámenes
+      await prisma.examFile.deleteMany({
+        where: { examId: { in: examIds } }
+      });
+
+      // 2. Eliminar intentos de examen de TODOS los usuarios
+      await prisma.examAttempt.deleteMany({
+        where: { examId: { in: examIds } }
+      });
+
+      // 3. Eliminar historial de exámenes
+      await prisma.examHistory.deleteMany({
+        where: { examId: { in: examIds } }
+      });
+
+      // 4. Obtener IDs de ventanas de estos exámenes
+      const examWindows = await prisma.examWindow.findMany({
+        where: { examId: { in: examIds } },
+        select: { id: true }
+      });
+      const windowIds = examWindows.map(w => w.id);
+
+      if (windowIds.length > 0) {
+        // 5. Eliminar inscripciones a estas ventanas
+        await prisma.inscription.deleteMany({
+          where: { examWindowId: { in: windowIds } }
+        });
+
+        // 6. Eliminar las ventanas
+        await prisma.examWindow.deleteMany({
+          where: { id: { in: windowIds } }
+        });
+      }
+
+      // 7. Eliminar preguntas de los exámenes
+      await prisma.pregunta.deleteMany({
+        where: { examId: { in: examIds } }
+      });
+
+      // 8. Eliminar los exámenes
+      await prisma.exam.deleteMany({
+        where: { id: { in: examIds } }
       });
     }
 
-    // Reasignar todos los exámenes al Backuser
-    await prisma.exam.updateMany({
-      where: { profesorId: userId },
-      data: { profesorId: backuser.id },
+    // Eliminar datos del usuario como estudiante
+    // 9. Eliminar archivos del usuario en otros exámenes
+    await prisma.examFile.deleteMany({
+      where: { userId: userId }
     });
 
-    // Eliminar al usuario original
+    // 10. Eliminar intentos del usuario en otros exámenes
+    await prisma.examAttempt.deleteMany({
+      where: { userId: userId }
+    });
+
+    // 11. Eliminar historial del usuario
+    await prisma.examHistory.deleteMany({
+      where: { userId: userId }
+    });
+
+    // 12. Eliminar inscripciones del usuario
+    await prisma.inscription.deleteMany({
+      where: { userId: userId }
+    });
+
+    // 13. Finalmente, eliminar al usuario
     await prisma.user.delete({ where: { id: userId } });
 
     res.json({
-      message: `Usuario ${user.nombre} eliminado. Sus exámenes fueron asignados al Backuser.`,
+      message: `Usuario ${user.nombre} y todos sus datos relacionados han sido eliminados completamente.`,
     });
   } catch (error) {
     console.error("Error en special delete:", error);
