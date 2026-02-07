@@ -201,15 +201,15 @@ const ExamAttemptRoute = (prisma: PrismaClient) => {
           }
         });
         
-        // Validar que existe el archivo principal
-        if (!mainFile || !mainFile.content || mainFile.content.trim() === '') {
+        // Validar que existe el archivo principal (permite contenido vacío)
+        if (!mainFile) {
           return res.status(400).json({ 
             error: `Debes guardar el archivo principal "${mainFileName}" antes de finalizar el examen` 
           });
         }
         
-        // Usar el contenido del archivo guardado manualmente
-        const codigoParaEvaluar = mainFile.content;
+        // Usar el contenido del archivo guardado manualmente (puede estar vacío)
+        const codigoParaEvaluar = mainFile.content || '';
         updateData.codigoProgramacion = codigoParaEvaluar;
         
         // Evaluación automática con test cases
