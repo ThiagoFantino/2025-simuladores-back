@@ -413,7 +413,7 @@ const ExamWindowRoute = (prisma: PrismaClient) => {
 
 // Obtener ventanas disponibles para estudiantes
 router.get('/disponibles', authenticateToken, requireRole(['student']), async (req, res) => {
-  const { materia, profesor, fecha } = req.query;
+  const { materia, profesor, fecha, windowId } = req.query;
 
   try {
     // Primero actualizar estados automáticamente y notificar via WebSocket
@@ -438,6 +438,11 @@ router.get('/disponibles', authenticateToken, requireRole(['student']), async (r
         }
       ]
     };
+
+    // Filtro por ID de ventana
+    if (windowId) {
+      whereClause.id = parseInt(windowId as string);
+    }
 
     // Filtro por nombre de ventana
     if (materia) {
