@@ -7,7 +7,7 @@
     <key>kioskMode</key>
     <integer>1</integer>
     <key>startURL</key>
-    <string>http://localhost:3000/exam-attempt/1?windowId=2&amp;token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsImVtYWlsIjoic3R1MkBnbWFpbC5jb20iLCJub21icmUiOiJzdHUiLCJyb2wiOiJzdHVkZW50IiwiaWF0IjoxNzYwNjI5NTc4LCJleHAiOjE3NjA2MzY3NzgsImlzcyI6ImV4YW1saW5lLWFwcCJ9.uPtP63rC3gWc0cK8rGPPvhK_MOjSCC1kODkplt_aL8Y</string>
+    <string>http://localhost:3000/exam-attempt/1?windowId=3&amp;token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImVtYWlsIjoiY3I3QGdtYWlsLmNvbSIsIm5vbWJyZSI6IkNyaXN0aWFubyBSb25hbGRvIiwicm9sIjoic3R1ZGVudCIsImlhdCI6MTc3MDU3NDg2NiwiZXhwIjoxNzcwNTgyMDY2LCJpc3MiOiJleGFtbGluZS1hcHAifQ.6v1Up_JS8p_M-muev9IV_Woq26pzmDKTS81p4yAkUdI</string>
     <key>allowQuit</key>
     <true />
     <key>browserViewMode</key>
@@ -1510,7 +1510,7 @@
     <key>enablePrivateClipboard</key>
     <true />
     <key>createNewDesktop</key>
-    <false />
+    <true />
     <key>killExplorerShell</key>
     <false />
     <key>enableLogging</key>
