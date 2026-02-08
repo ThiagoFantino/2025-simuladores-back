@@ -257,6 +257,11 @@ const ExamRoute = (prisma: PrismaClient) => {
         });
       }
 
+      // 🔒 Validación de propiedad para profesores
+      if (req.user!.rol === 'professor' && exam.profesorId !== req.user!.userId) {
+        return res.status(403).json({ error: "No tienes permiso para ver este examen" });
+      }
+
       // Ocultar solución de referencia si no es el profesor dueño
       const examResponse = { ...exam };
       if (exam.profesorId !== req.user!.userId) {
