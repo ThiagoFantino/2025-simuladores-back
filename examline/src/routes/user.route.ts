@@ -22,8 +22,17 @@ const UserRoute = (prisma: PrismaClient) => {
   // Obtener un usuario por id (protected)
   router.get('/:id', authenticateToken, async (req, res) => {
     try {
+      const targetUserId = parseInt(req.params.id);
+      const requestingUserId = req.user!.userId;
+      const requestingUserRole = req.user!.rol;
+
+      // Validación de permisos: solo el propietario, profesores o system pueden ver detalles
+      if (requestingUserRole === 'student' && requestingUserId !== targetUserId) {
+        return res.status(403).json({ error: 'No tienes permisos para ver este usuario' });
+      }
+
       const user = await prisma.user.findUnique({
-        where: { id: parseInt(req.params.id) },
+        where: { id: targetUserId },
         select: { id: true, nombre: true, email: true, rol: true },
       });
 
@@ -221,9 +230,19 @@ const UserRoute = (prisma: PrismaClient) => {
     }
   });*/
   // Eliminar usuario y todos sus datos relacionados
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, requireRole(['system', 'professor']), async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
+    const requestingUserId = req.user!.userId;
+
+    // Validación adicional: solo el propietario puede eliminar su propia cuenta
+    // o un profesor/system puede eliminar estudiantes
+    if (req.user!.rol === 'professor' || req.user!.rol === 'system') {
+      const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+      if (targetUser && targetUser.rol === 'professor' && targetUser.id !== requestingUserId) {
+        return res.status(403).json({ error: 'No puedes eliminar a otro profesor' });
+      }
+    }
 
     // Verificar si el usuario existe
     const user = await prisma.user.findUnique({

@@ -12,7 +12,27 @@ router.get('/:examId/files', authenticateToken, async (req, res) => {
   try {
     const { examId } = req.params;
     const userId = req.user!.userId;
+    const userRole = req.user!.rol;
     const version = req.query.version || 'manual'; // Obtener versión del query param
+
+    // 🔒 Validación de seguridad: verificar que el estudiante esté inscrito en una ventana activa de este examen
+    if (userRole === 'student') {
+      const inscription = await prisma.inscription.findFirst({
+        where: {
+          userId: userId,
+          examWindow: {
+            examId: parseInt(examId),
+            activa: true
+          },
+          cancelledAt: null
+        },
+        include: { examWindow: true }
+      });
+
+      if (!inscription) {
+        return res.status(403).json({ error: 'No estás inscrito en una ventana activa de este examen' });
+      }
+    }
 
     const files = await prisma.examFile.findMany({
       where: {
@@ -45,7 +65,26 @@ router.get('/:examId/files/:filename', authenticateToken, async (req, res) => {
   try {
     const { examId, filename } = req.params;
     const userId = req.user!.userId;
+    const userRole = req.user!.rol;
     const version = req.query.version || 'manual'; // Obtener versión del query param
+
+    // 🔒 Validación de seguridad: verificar que el estudiante esté inscrito
+    if (userRole === 'student') {
+      const inscription = await prisma.inscription.findFirst({
+        where: {
+          userId: userId,
+          examWindow: {
+            examId: parseInt(examId),
+            activa: true
+          },
+          cancelledAt: null
+        }
+      });
+
+      if (!inscription) {
+        return res.status(403).json({ error: 'No estás inscrito en una ventana activa de este examen' });
+      }
+    }
 
     const file = await prisma.examFile.findFirst({
       where: {
@@ -73,9 +112,28 @@ router.post('/:examId/files', authenticateToken, async (req, res) => {
     const { examId } = req.params;
     const { filename, content, version = 'manual' } = req.body; // Agregar version con default 'manual'
     const userId = req.user!.userId;
+    const userRole = req.user!.rol;
 
     if (!filename) {
       return res.status(400).json({ error: 'Nombre de archivo requerido' });
+    }
+
+    // 🔒 Validación de seguridad: verificar que el estudiante esté inscrito
+    if (userRole === 'student') {
+      const inscription = await prisma.inscription.findFirst({
+        where: {
+          userId: userId,
+          examWindow: {
+            examId: parseInt(examId),
+            activa: true
+          },
+          cancelledAt: null
+        }
+      });
+
+      if (!inscription) {
+        return res.status(403).json({ error: 'No estás inscrito en una ventana activa de este examen' });
+      }
     }
 
     // Usar upsert para crear o actualizar en una sola operación
@@ -114,7 +172,26 @@ router.delete('/:examId/files/:filename', authenticateToken, async (req, res) =>
   try {
     const { examId, filename } = req.params;
     const userId = req.user!.userId;
+    const userRole = req.user!.rol;
     const version = req.query.version || 'manual'; // Obtener versión del query param
+
+    // 🔒 Validación de seguridad: verificar que el estudiante esté inscrito
+    if (userRole === 'student') {
+      const inscription = await prisma.inscription.findFirst({
+        where: {
+          userId: userId,
+          examWindow: {
+            examId: parseInt(examId),
+            activa: true
+          },
+          cancelledAt: null
+        }
+      });
+
+      if (!inscription) {
+        return res.status(403).json({ error: 'No estás inscrito en una ventana activa de este examen' });
+      }
+    }
 
     const file = await prisma.examFile.findFirst({
       where: {
@@ -146,9 +223,28 @@ router.post('/:examId/files/submission', authenticateToken, async (req, res) => 
     const { examId } = req.params;
     const { files } = req.body; // Array de { filename, content }
     const userId = req.user!.userId;
+    const userRole = req.user!.rol;
 
     if (!files || !Array.isArray(files)) {
       return res.status(400).json({ error: 'Se requiere un array de archivos' });
+    }
+
+    // 🔒 Validación de seguridad: verificar que el estudiante esté inscrito
+    if (userRole === 'student') {
+      const inscription = await prisma.inscription.findFirst({
+        where: {
+          userId: userId,
+          examWindow: {
+            examId: parseInt(examId),
+            activa: true
+          },
+          cancelledAt: null
+        }
+      });
+
+      if (!inscription) {
+        return res.status(403).json({ error: 'No estás inscrito en una ventana activa de este examen' });
+      }
     }
 
     // Crear/actualizar todos los archivos con versión "submission"
