@@ -207,42 +207,4 @@ describe('InscriptionRoute tests', () => {
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body[0].user.nombre).toBe('Test Student');
   });
-
-  // ================= PATCH /:id/asistencia =================
-  it('PATCH /:id/asistencia should mark attendance', async () => {
-    const mockInscription = {
-      id: 1,
-      examWindow: {
-        exam: {
-          profesorId: 2 // matches mock professor ID
-        }
-      }
-    };
-
-    prismaMock.inscription.findFirst.mockResolvedValue(mockInscription);
-    prismaMock.inscription.update.mockResolvedValue({ ...mockInscription, presente: true });
-
-    const res = await request(app)
-      .patch('/inscriptions/1/asistencia')
-      .send({ presente: true });
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveProperty('success', true);
-    expect(res.body).toHaveProperty('presente', true);
-  });
-
-  it('PATCH /:id/asistencia should fail if not professor of exam', async () => {
-    // Mock that inscription exists but professor doesn't have permission
-    prismaMock.inscription.findFirst.mockResolvedValue(null); // No permission
-    prismaMock.inscription.findUnique.mockResolvedValue({ 
-      id: 1 
-    }); // But inscription exists
-
-    const res = await request(app)
-      .patch('/inscriptions/1/asistencia')
-      .send({ presente: true });
-
-    expect(res.statusCode).toBe(403);
-    expect(res.body).toHaveProperty('error', 'No tienes permisos para esta inscripción');
-  });
 });

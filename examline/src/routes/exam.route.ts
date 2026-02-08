@@ -195,16 +195,6 @@ const ExamRoute = (prisma: PrismaClient) => {
           });
         }
 
-        // Solo verificar presente si la ventana requiere presentismo
-        // Ser defensivo: si requierePresente es null/undefined, asumir false (acceso libre)
-        const requierePresente = inscription.examWindow.requierePresente === true;
-        if (requierePresente && !inscription.presente) {
-          return res.status(403).json({ 
-            error: "No estás habilitado para rendir este examen",
-            code: "NOT_ENABLED" 
-          });
-        }
-
         // Verificar que la ventana esté activa
         if (!inscription.examWindow.activa) {
           return res.status(403).json({ 
@@ -255,6 +245,11 @@ const ExamRoute = (prisma: PrismaClient) => {
           update: { viewedAt: new Date() },
           create: { userId: req.user!.userId, examId },
         });
+      }
+
+      // 🔒 Validación de propiedad para profesores
+      if (req.user!.rol === 'professor' && exam.profesorId !== req.user!.userId) {
+        return res.status(403).json({ error: "No tienes permiso para ver este examen" });
       }
 
       // Ocultar solución de referencia si no es el profesor dueño

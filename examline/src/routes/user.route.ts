@@ -229,35 +229,30 @@ const UserRoute = (prisma: PrismaClient) => {
       res.status(500).json({ error: 'Error al eliminar el usuario.' });
     }
   });*/
-  // Eliminar usuario y todos sus datos relacionados
-router.delete('/:id', authenticateToken, requireRole(['system', 'professor']), async (req, res) => {
+// Eliminar usuario y todos sus datos relacionados (cada uno puede borrarse a sí mismo)
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
-    const requestingUserId = req.user!.userId;
 
-    // Validación adicional: solo el propietario puede eliminar su propia cuenta
-    // o un profesor/system puede eliminar estudiantes
-    if (req.user!.rol === 'professor' || req.user!.rol === 'system') {
-      const targetUser = await prisma.user.findUnique({ where: { id: userId } });
-      if (targetUser && targetUser.rol === 'professor' && targetUser.id !== requestingUserId) {
-        return res.status(403).json({ error: 'No puedes eliminar a otro profesor' });
-      }
+    // Solo el propietario puede eliminar su propia cuenta
+    if (req.user!.userId !== userId) {
+      return res.status(403).json({ error: 'Solo puedes eliminar tu propia cuenta' });
     }
 
     // Verificar si el usuario existe
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { exams: true },
+      include: { exams: true }, // Incluye los exámenes que el usuario creó como profesor
     });
 
     if (!user) {
       return res.status(404).json({ error: "Usuario no encontrado." });
     }
 
-    // Obtener todos los IDs de exámenes del usuario
+    // Obtener todos los IDs de exámenes que el usuario creó
     const examIds = user.exams.map(exam => exam.id);
 
-    // Eliminar en cascada todos los datos relacionados
+    // Eliminar en cascada todos los datos relacionados con sus exámenes
     if (examIds.length > 0) {
       // 1. Eliminar archivos de examen de TODOS los usuarios relacionados con estos exámenes
       await prisma.examFile.deleteMany({
@@ -332,10 +327,11 @@ router.delete('/:id', authenticateToken, requireRole(['system', 'professor']), a
       message: `Usuario ${user.nombre} y todos sus datos relacionados han sido eliminados completamente.`,
     });
   } catch (error) {
-    console.error("Error en special delete:", error);
-    res.status(500).json({ error: "Error en el proceso de eliminación especial." });
+    console.error("Error en el proceso de eliminación:", error);
+    res.status(500).json({ error: "Error en el proceso de eliminación del usuario." });
   }
 });
+
 
   return router;
 };

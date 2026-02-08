@@ -26,13 +26,6 @@ const ExamAttemptRoute = (prisma: PrismaClient) => {
           return res.status(403).json({ error: "No estás inscrito en esta ventana" });
         }
 
-        // Solo verificar presente si la ventana requiere presentismo
-        // Ser defensivo: si requierePresente es null/undefined, asumir false (acceso libre)
-        const requierePresente = inscription.examWindow.requierePresente === true;
-        if (requierePresente && !inscription.presente) {
-          return res.status(403).json({ error: "No estás habilitado para este examen" });
-        }
-
         // Verificar que la ventana esté activa
         if (!inscription.examWindow.activa) {
           return res.status(403).json({ error: "Esta ventana de examen ha sido desactivada por el profesor" });
