@@ -265,30 +265,6 @@ const ExamRoute = (prisma: PrismaClient) => {
     }
   });
 
-  // GET /exams/history/:userId → obtiene historial de exámenes (protected)
-  router.get("/history/:userId", authenticateToken, async (req, res) => {
-    const targetUserId = parseInt(req.params.userId);
-    if (isNaN(targetUserId)) return res.status(400).json({ error: "userId inválido" });
-
-    // Users can only see their own history, professors can see any student's history
-    if (req.user!.rol === 'student' && req.user!.userId !== targetUserId) {
-      return res.status(403).json({ error: "No puedes ver el historial de otro usuario" });
-    }
-
-    try {
-      const history = await prisma.examHistory.findMany({
-        where: { userId: targetUserId },
-        include: { exam: true },
-        orderBy: { viewedAt: "desc" },
-      });
-
-      res.json(history);
-    } catch (error) {
-      console.error('Error fetching exam history:', error);
-      res.status(500).json({ error: "Error al obtener historial" });
-    }
-  });
-
   // POST /exams/:id/test-solution (protected - professors only)
   // Ejecuta tests contra código temporal o solución de referencia
   router.post("/:id/test-solution", authenticateToken, requireRole(['professor']), async (req, res) => {
