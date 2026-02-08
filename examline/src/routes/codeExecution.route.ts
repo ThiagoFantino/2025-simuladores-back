@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireRole } from '../middleware/auth';
 import CodeExecutionService from '../services/codeExecution.service.js';
 
 const CodeExecutionRoute = (prisma: PrismaClient) => {
@@ -15,6 +15,8 @@ const CodeExecutionRoute = (prisma: PrismaClient) => {
   router.post('/run', authenticateToken, async (req, res) => {
     try {
       const { code, language, examId, input } = req.body;
+      const userId = req.user!.userId;
+      const userRole = req.user!.rol;
 
       // Validaciones
       if (!code || !language) {
@@ -29,7 +31,7 @@ const CodeExecutionRoute = (prisma: PrismaClient) => {
         });
       }
 
-      // Por ahora solo validamos que el examen existe si se proporciona
+      // Validar examen y permisos
       if (examId) {
         const exam = await prisma.exam.findUnique({
           where: { id: parseInt(examId) }
@@ -43,6 +45,24 @@ const CodeExecutionRoute = (prisma: PrismaClient) => {
           return res.status(400).json({
             error: 'Este examen no es de tipo programación'
           });
+        }
+
+        // 🔒 Validación de seguridad: verificar que el estudiante esté inscrito
+        if (userRole === 'student') {
+          const inscription = await prisma.inscription.findFirst({
+            where: {
+              userId: userId,
+              examWindow: {
+                examId: parseInt(examId),
+                activa: true
+              },
+              cancelledAt: null
+            }
+          });
+
+          if (!inscription) {
+            return res.status(403).json({ error: 'No estás inscrito en una ventana activa de este examen' });
+          }
         }
       }
 
@@ -115,7 +135,7 @@ const CodeExecutionRoute = (prisma: PrismaClient) => {
    *   customInput?: string 
    * }
    */
-  router.post('/execute', authenticateToken, async (req, res) => {
+  router.post('/execute', authenticateToken, requireRole(['professor']), async (req, res) => {
     try {
       const { code, language, filename, testCases, customInput } = req.body;
 

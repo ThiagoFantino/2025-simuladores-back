@@ -1,7 +1,7 @@
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h'; // 2 hours as requested
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN; // 2 hours as requested
 
 export interface JWTPayload {
   userId: number;
