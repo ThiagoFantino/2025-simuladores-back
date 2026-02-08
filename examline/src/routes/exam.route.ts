@@ -1,7 +1,7 @@
 import { type PrismaClient } from "@prisma/client";
 import { Router } from "express";
 import { authenticateToken, requireRole } from "../middleware/auth.ts";
-import CodeExecutionService from "../services/codeExecution.service.js";
+import CodeExecutionService from "../services/codeExecution.service.ts";
 
 const ExamRoute = (prisma: PrismaClient) => {
   const router = Router();
