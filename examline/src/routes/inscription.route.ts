@@ -25,6 +25,26 @@ const InscriptionRoute = (prisma: PrismaClient) => {
         return res.status(404).json({ error: 'Ventana de examen no encontrada' });
       }
 
+      // ⛔ NUEVA VALIDACIÓN
+      const alreadyInscribedSameExam = await prisma.inscription.findFirst({
+        where: {
+          userId,
+          cancelledAt: null,
+          examWindow: {
+            examId: examWindow.examId,
+              NOT: { id: examWindowId }
+          }
+        }
+      });
+
+    if (alreadyInscribedSameExam) {
+      return res.status(400).json({
+        error: 'Ya estás inscrito en otra ventana de este examen'
+      });
+    }     
+
+      
+
       // Validaciones
       if (!examWindow.activa) {
         return res.status(400).json({ error: 'Esta ventana no está disponible para inscripciones' });
