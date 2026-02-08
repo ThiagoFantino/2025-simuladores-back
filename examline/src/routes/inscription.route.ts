@@ -292,50 +292,6 @@ const InscriptionRoute = (prisma: PrismaClient) => {
     }
   });
 
-  // Marcar asistencia (para profesores)
-  router.patch('/:id/asistencia', authenticateToken, requireRole(['professor']), async (req, res) => {
-    const inscriptionId = parseInt(req.params.id);
-    const { presente } = req.body;
-
-    try {
-      // Verificar que la inscripción existe y la ventana pertenece al profesor
-      const inscription = await prisma.inscription.findFirst({
-        where: {
-          id: inscriptionId,
-          examWindow: {
-            exam: {
-              profesorId: req.user!.userId
-            }
-          }
-        }
-      });
-
-      if (!inscription) {
-        // Verificar si la inscripción existe primero
-        const existsInscription = await prisma.inscription.findUnique({
-          where: { id: inscriptionId }
-        });
-
-        if (!existsInscription) {
-          return res.status(404).json({ error: 'Inscripción no encontrada' });
-        } else {
-          // La inscripción existe pero el profesor no tiene permisos
-          return res.status(403).json({ error: 'No tienes permisos para esta inscripción' });
-        }
-      }
-
-      const updatedInscription = await prisma.inscription.update({
-        where: { id: inscriptionId },
-        data: { presente: presente }
-      });
-
-      res.json({ success: true, presente: updatedInscription.presente });
-    } catch (error: any) {
-      console.error('Error marcando asistencia:', error);
-      res.status(500).json({ error: 'Error interno del servidor' });
-    }
-  });
-
   return router;
 };
 
