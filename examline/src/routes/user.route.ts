@@ -7,18 +7,6 @@ import { authenticateToken, requireRole } from "../middleware/auth.ts";
 const UserRoute = (prisma: PrismaClient) => {
   const router = Router();
 
-  // Obtener todos los usuarios (protected - professors only)
-  router.get('/', authenticateToken, requireRole(['professor', 'system']), async (req, res) => {
-    try {
-      const users = await prisma.user.findMany({
-        select: { id: true, nombre: true, email: true, rol: true },
-      });
-      res.json(users);
-    } catch (error) {
-      res.status(500).json({ error: 'Error al obtener los usuarios.' });
-    }
-  });
-
   // Obtener un usuario por id (protected)
   router.get('/:id', authenticateToken, async (req, res) => {
     try {
@@ -46,17 +34,31 @@ const UserRoute = (prisma: PrismaClient) => {
     }
   });
 
-  // Registrar usuario
+// Registrar usuario
   router.post("/signup", async (req, res) => {
     const { nombre, email, password, rol } = req.body;
 
     try {
+      // 🔒 Bloquear explícitamente system
+      if (rol === "system") {
+        return res.status(403).json({
+          error: "No se puede crear un usuario system",
+        });
+      }
+
+      // ✅ Solo roles permitidos
+      const allowedRoles = ["student", "professor"] as const;
+
+      const finalRole = allowedRoles.includes(rol)
+        ? rol
+        : "student"; // default seguro
+
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
         return res.status(400).json({ error: "El email ya está registrado." });
       }
 
-      // Password is already client-side hashed, now hash it again with bcrypt
+      // Password sigue como lo tenés hoy (doble hash)
       const doubleHashedPassword = await bcrypt.hash(password, 10);
 
       const user = await prisma.user.create({
@@ -64,61 +66,68 @@ const UserRoute = (prisma: PrismaClient) => {
           nombre,
           email,
           password: doubleHashedPassword,
-          rol: rol || "student", // 👈 por defecto student
+          rol: finalRole,
         },
         select: { id: true, nombre: true, email: true, rol: true },
       });
 
       res.status(201).json(user);
+
     } catch (error) {
       console.error("Error al crear el usuario:", error);
       res.status(500).json({ error: "Error al crear el usuario." });
     }
   });
 
+
   // Login
-  router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
 
-    try {
-      const user = await prisma.user.findUnique({ where: { email } });
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
 
-      if (!user) {
-        return res.status(404).json({ error: 'El email no está registrado.' });
-      }
+    // Hash dummy para evitar timing attacks si el usuario no existe
+    const dummyHash =
+      '$2a$10$CwTycUXWue0Thq9StjUM0uJ8hDigw1k3DybZ0SqnXl16/ZDpD9KpW'; // bcrypt de "dummy"
 
-      // Password comes already client-side hashed, compare with stored double-hashed password
-      const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    const passwordToCompare = user ? user.password : dummyHash;
 
-      if (!isPasswordCorrect) {
-        return res.status(401).json({ error: 'Contraseña incorrecta.' });
-      }
+    const isPasswordCorrect = await bcrypt.compare(password, passwordToCompare);
 
-      // Generate JWT token
-      const tokenPayload = {
-        userId: user.id,
-        email: user.email,
-        nombre: user.nombre,
-        rol: user.rol,
-      };
-
-      const token = generateToken(tokenPayload);
-
-      return res.json({
-        message: 'Login exitoso',
-        token, // JWT token
-        user: {
-          userId: user.id,
-          nombre: user.nombre,
-          email: user.email,
-          rol: user.rol,
-        },
+    // ❌ NO diferenciar si el email existe o no
+    if (!user || !isPasswordCorrect) {
+      return res.status(401).json({
+        error: 'Credenciales inválidas',
       });
-    } catch (error) {
-      console.error('Error al verificar el usuario:', error);
-      return res.status(500).json({ error: 'Hubo un problema al verificar las credenciales' });
     }
-  });
+
+    const tokenPayload = {
+      userId: user.id,
+      email: user.email,
+      nombre: user.nombre,
+      rol: user.rol,
+    };
+
+    const token = generateToken(tokenPayload);
+
+    return res.json({
+      message: 'Login exitoso',
+      token,
+      user: {
+        userId: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        rol: user.rol,
+      },
+    });
+  } catch (error) {
+    console.error('Error al verificar el usuario:', error);
+    return res.status(500).json({
+      error: 'Hubo un problema al verificar las credenciales',
+    });
+  }
+});
 
   // Token refresh endpoint
   router.post('/refresh-token', authenticateToken, async (req, res) => {
