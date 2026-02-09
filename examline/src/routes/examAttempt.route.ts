@@ -34,7 +34,7 @@ const ExamAttemptRoute = (prisma: PrismaClient) => {
         // Verificar disponibilidad del examen
         if (inscription.examWindow.sinTiempo) {
           // Para ventanas sin tiempo, solo verificar que esté activa
-          if (inscription.examWindow.estado !== 'programada') {
+          if (!inscription.examWindow.activa) {
             return res.status(403).json({ error: "El examen no está disponible" });
           }
         } else {
